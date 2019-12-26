@@ -35,8 +35,6 @@ class AssetsAsset(models.Model):
     _name = "account.asset.asset"
     _inherit = "account.asset.asset"
 
-    method_new = fields.Integer(string="Number of Months in a Period")
-
     def compute_depreciation_board(self):
         _logger.info("test_fungsi_inherit")
         self.ensure_one()
@@ -68,9 +66,6 @@ class AssetsAsset(models.Model):
                 )
                 depreciation_date = last_depreciation_date + relativedelta(
                     months=+self.method_period
-                )
-                depreciation_date = last_depreciation_date + relativedelta(
-                    months=+self.method_number
                 )
             else:
                 # depreciation_date computed from the purchase date
@@ -123,16 +118,18 @@ class AssetsAsset(models.Model):
                     posted_depreciation_line_ids,
                     total_days,
                     depreciation_date,
-                    "Linear",
+                    "linear",
                 )
                 amount = self.currency_id.round(amount)
                 amount_linear = self.currency_id.round(amount_linear)
+
                 if float_is_zero(amount, precision_rounding=self.currency_id.rounding):
                     continue
                 if float_is_zero(
                     amount_linear, precision_rounding=self.currency_id.rounding
                 ):
                     continue
+
                 residual_amount -= amount
                 residual_amount_linear -= amount_linear
                 vals = {
@@ -155,9 +152,6 @@ class AssetsAsset(models.Model):
                 depreciation_date = depreciation_date + relativedelta(
                     months=+self.method_period
                 )
-                depreciation_date = depreciation_date + relativedelta(
-                    months=+self.method_number
-                )
 
                 if month_day > 28 and self.date_first_depreciation == "manual":
                     max_day_in_month = calendar.monthrange(
@@ -171,7 +165,6 @@ class AssetsAsset(models.Model):
                 if (
                     not self.prorata
                     and self.method_period % 12 != 0
-                    and self.method_number % 12 != 0
                     and self.date_first_depreciation == "last_day_period"
                 ):
                     max_day_in_month = calendar.monthrange(
@@ -180,7 +173,6 @@ class AssetsAsset(models.Model):
                     depreciation_date = depreciation_date.replace(day=max_day_in_month)
 
         self.write({"depreciation_line_ids": commands})
-
         return True
 
     def _compute_board_amount(
@@ -203,23 +195,13 @@ class AssetsAsset(models.Model):
                     undone_dotation_number - len(posted_depreciation_line_ids)
                 )
                 if self.prorata:
-                    amount = amount_to_depr / self.method_period
-                if self.prorata:
-                    amount_linear = amount_to_depr / self.method_number
+                    amount = amount_to_depr / self.method_number
                     if sequence == 1:
                         date = self.date
                         if self.method_period % 12 != 0:
                             month_days = calendar.monthrange(date.year, date.month)[1]
                             days = month_days - date.day + 1
-                        if self.method_number % 12 != 0:
-                            month_days = calendar.monthrange(date.year, date.month)[1]
-                            days = month_days - date.day + 1
                             amount = (
-                                (amount_to_depr / self.method_period)
-                                / month_days
-                                * days
-                            )
-                            amount_linear = (
                                 (amount_to_depr / self.method_number)
                                 / month_days
                                 * days
@@ -232,12 +214,32 @@ class AssetsAsset(models.Model):
                                 - date
                             ).days + 1
                             amount = (
-                                (amount_to_depr / self.method_period)
+                                (amount_to_depr / self.method_number)
                                 / total_days
                                 * days
                             )
-                            amount_linear = (
-                                (amount_to_depr / self.method_number)
+            elif method == "degressive":
+                amount = residual_amount * self.method_progress_factor
+                if self.prorata:
+                    if sequence == 1:
+                        date = self.date
+                        if self.method_period % 12 != 0:
+                            month_days = calendar.monthrange(date.year, date.month)[1]
+                            days = month_days - date.day + 1
+                            amount = (
+                                (residual_amount * self.method_progress_factor)
+                                / month_days
+                                * days
+                            )
+                        else:
+                            days = (
+                                self.company_id.compute_fiscalyear_dates(date)[
+                                    "date_to"
+                                ]
+                                - date
+                            ).days + 1
+                            amount = (
+                                (residual_amount * self.method_progress_factor)
                                 / total_days
                                 * days
                             )
