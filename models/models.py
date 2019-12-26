@@ -109,6 +109,7 @@ class AssetsAsset(models.Model):
                     total_days,
                     depreciation_date,
                     "linear",
+                    self.method_number,
                 )
                 amount_linear = self._compute_board_amount(
                     sequence,
@@ -119,6 +120,7 @@ class AssetsAsset(models.Model):
                     total_days,
                     depreciation_date,
                     "linear",
+                    self.category_id.method_new,
                 )
                 amount = self.currency_id.round(amount)
                 amount_linear = self.currency_id.round(amount_linear)
@@ -185,6 +187,7 @@ class AssetsAsset(models.Model):
         total_days,
         depreciation_date,
         method,
+        method_number,
     ):
         amount = 0
         if sequence == undone_dotation_number:
@@ -195,16 +198,14 @@ class AssetsAsset(models.Model):
                     undone_dotation_number - len(posted_depreciation_line_ids)
                 )
                 if self.prorata:
-                    amount = amount_to_depr / self.method_number
+                    amount = amount_to_depr / method_number
                     if sequence == 1:
                         date = self.date
                         if self.method_period % 12 != 0:
                             month_days = calendar.monthrange(date.year, date.month)[1]
                             days = month_days - date.day + 1
                             amount = (
-                                (amount_to_depr / self.method_number)
-                                / month_days
-                                * days
+                                (amount_to_depr / method_number) / month_days * days
                             )
                         else:
                             days = (
@@ -214,9 +215,7 @@ class AssetsAsset(models.Model):
                                 - date
                             ).days + 1
                             amount = (
-                                (amount_to_depr / self.method_number)
-                                / total_days
-                                * days
+                                (amount_to_depr / method_number) / total_days * days
                             )
             elif method == "degressive":
                 amount = residual_amount * self.method_progress_factor
